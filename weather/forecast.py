@@ -25,6 +25,20 @@ def lambda_handler(event, context):
         'statusCode': 200,
         'body': htmlpage
     }
+def get_max_wind(p_raw_wind_speed, p_wind_raw_direction):
+
+    #wind comes in 2 forms:  7 mph and 6 to 19 mph. need to get last if range is provided.
+
+    parsed_windspeed = p_raw_wind_speed.split(' ')
+    max_wind_speed = parsed_windspeed[len(parsed_windspeed)-2]
+
+    formatted_wind = ""
+    if int(max_wind_speed) >= 15:
+        formatted_wind =  "<br>" + "Wind: " + max_wind_speed + " mph " + p_wind_raw_direction
+
+
+    return formatted_wind
+
 
 def send_email(htmlpage):
     SENDER = "x@x.com"
@@ -117,7 +131,8 @@ def weather_report():
     htmlpage += "<tr>"
     for i in periods:
         if i['isDaytime']:
-            htmlpage += "<td word-wrap: break-word>" + "Hi " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + "</td>"
+            wind_info = get_max_wind(i['windSpeed'],i['windDirection'])
+            htmlpage += "<td>" + "Hi " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + wind_info + "</td>"
 
 
     htmlpage += "</tr>\n"
@@ -134,7 +149,8 @@ def weather_report():
     htmlpage += "<tr>"
     for i in periods:
         if not i['isDaytime']:
-            htmlpage += "<td>" + "Lo " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + "</td>"
+            wind_info = get_max_wind(i['windSpeed'],i['windDirection'])
+            htmlpage += "<td>" + "Lo " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + wind_info  + "</td>"
 
     htmlpage += "</tr>\n"
 
