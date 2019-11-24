@@ -93,6 +93,20 @@ def send_email(htmlpage):
         print("Email sent! Message ID:"),
         print(response['MessageId'])
 
+def get_max_wind(p_raw_wind_speed, p_wind_raw_direction):
+
+    #wind comes in 2 forms:  7 mph and 6 to 19 mph. need to get last if range is provided.
+
+    parsed_windspeed = p_raw_wind_speed.split(' ')
+    max_wind_speed = parsed_windspeed[len(parsed_windspeed)-2]
+
+    formatted_wind = ""
+    if int(max_wind_speed) >= 15:
+        formatted_wind =  "<br>" + "Wind: " + max_wind_speed + " mph " + p_wind_raw_direction
+
+
+    return formatted_wind
+
 def weather_report():
     global htmlpage
 
@@ -101,11 +115,13 @@ def weather_report():
     response = requests.request("GET", url)
 
     #print(response.text)
+
     data = response.json()
+
 
     periods = data["properties"]["periods"]
 
-    #build the table header
+    #build the table header for the forecast by day of week/AM/PM
     htmlpage += "<tr>"
     for i in periods:
         if i['isDaytime']:
@@ -117,8 +133,8 @@ def weather_report():
     htmlpage += "<tr>"
     for i in periods:
         if i['isDaytime']:
-            htmlpage += "<td word-wrap: break-word>" + "Hi " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + "</td>"
-
+            wind_info = get_max_wind(i['windSpeed'],i['windDirection'])
+            htmlpage += "<td>" + "Hi " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + wind_info + "</td>"
 
     htmlpage += "</tr>\n"
 
@@ -134,7 +150,8 @@ def weather_report():
     htmlpage += "<tr>"
     for i in periods:
         if not i['isDaytime']:
-            htmlpage += "<td>" + "Lo " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + "</td>"
+            wind_info = get_max_wind(i['windSpeed'],i['windDirection'])
+            htmlpage += "<td>" + "Lo " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + wind_info  + "</td>"
 
     htmlpage += "</tr>\n"
 
@@ -150,8 +167,23 @@ def weather_report():
 
     htmlpage += "</tr>\n"
 
+    #now get detailed forecast
     htmlpage += """
 </table>
+<hr/>
+"""
+
+    #build the table for the detailed forecast by day of week/AM/PM
+    htmlpage += "<h3>Detailed Forecast </h3> "
+    htmlpage += """
+    <table border="1" width="645"> 
+    """
+    for i in periods:
+        htmlpage += "<tr><td style=""" + "font-weight:bold""" + ">"
+        htmlpage += i['name'] + "</td> <td>" + i['detailedForecast'] + "</td></tr>"
+
+    #finish up html string
+    htmlpage += """
 </body>
 </html>
 """
