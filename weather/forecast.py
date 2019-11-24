@@ -27,8 +27,8 @@ def lambda_handler(event, context):
     }
 
 def send_email(htmlpage):
-    SENDER = "renee@plesba.com"
-    RECIPIENT = "damm@plesba.com"
+    SENDER = "x@x.com"
+    RECIPIENT = "x@x.com"
     CONFIGURATION_SET = "ConfigSet"
     AWS_REGION = "us-west-2"
 
