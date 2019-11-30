@@ -14,9 +14,26 @@ htmlpage = """
 <table border="1" width="645">
 """
 def main():
-    weather_report()
-    print(htmlpage)
-    send_email(htmlpage)
+
+    weather_report_gend = False
+
+    i = 1
+    while i < 4:
+        try:
+            weather_report()
+        except KeyError:
+            time.sleep(60)
+            i += 1
+            continue
+        else:
+            weather_report_gend = True
+            break
+
+    if weather_report_gend:
+        print(htmlpage)
+        send_email(htmlpage)
+    else:
+        print("Weather Report could not be generated")
 
 def lambda_handler(event, context):
     weather_report()
@@ -117,7 +134,6 @@ def weather_report():
     #print(response.text)
 
     data = response.json()
-
 
     periods = data["properties"]["periods"]
 
