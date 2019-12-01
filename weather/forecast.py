@@ -17,17 +17,12 @@ def main():
 
     weather_report_gend = False
 
-    i = 1
-    while i < 4:
-        try:
-            weather_report()
-        except KeyError:
-            time.sleep(60)
-            i += 1
-            continue
-        else:
-            weather_report_gend = True
+    for i in range(3):
+        weather_report_gend = weather_report()
+        if weather_report_gend:
             break
+        else:
+            time.sleep(60)
 
     if weather_report_gend:
         print(htmlpage)
@@ -129,7 +124,15 @@ def weather_report():
 
     url = "https://api.weather.gov/gridpoints/BOU/45,66/forecast"
 
-    response = requests.request("GET", url)
+    try:
+        response = requests.request("GET", url)
+    except requests.exceptions.Timeout:
+        print ("Timeout exception on get request")
+        return False
+    except requests.exceptions.RequestException as e:
+        print ("Exception raised on get request")
+        print (e)
+        return False
 
     #print(response.text)
 
@@ -203,5 +206,6 @@ def weather_report():
 </body>
 </html>
 """
+    return True
 
 if __name__ == "__main__": main()
