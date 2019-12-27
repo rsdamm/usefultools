@@ -5,15 +5,13 @@ from datetime import datetime, timezone
 
 # https://docs.aws.amazon.com/ses/latest/DeveloperGuide/send-using-sdk-python.html
 
-htmlpage = """
-<html><head><title>Forecast</title></head>
-"""
-
 
 def lambda_handler(event, context):
+#cannot be global or lambda will reuse for subsequent executions from same container
+    v_htmlpage = ""
     weather_report_gend = False
 
-    # get parameters for execution {"latitude": "39.828043","longitude":"-105.478366","location":"Black Hawk"}
+    # get parameters for execution example format: {"latitude": "39.828043","longitude":"-105.478366","location":"Black Hawk"}
     if 'latitude' in event:
         v_latitude = event['latitude']
     else:
@@ -28,30 +26,32 @@ def lambda_handler(event, context):
         raise Exception('Location not provided')
 
     for i in range(5):
-        weather_report_gend = weather_report(v_latitude, v_longitude, v_location)
-        if weather_report_gend:
-            break
-        else:
-            print("Unable to generate weather forecast...retrying")
+        v_htmlpage = weather_report(v_latitude, v_longitude, v_location)
+
+        if not v_htmlpage:
+            print("Unable to generate weather forecast...Attempt #" + str(i) + " failed...retrying")
             time.sleep(60)
+        else:
+            weather_report_gend = True
 
     if weather_report_gend:
-        # print(htmlpage)
-        send_email(htmlpage, v_location)
+        # print(v_htmlpage)
+        send_email(v_htmlpage, v_location)
     else:
         print("Weather Report could not be generated")
     return {
         'statusCode': 200,
-        'body': htmlpage
+        'body': v_htmlpage
     }
 
 
-def send_email(htmlpage, p_location):
+def send_email(p_htmlpage, p_location):
     SENDER = "x@x.com"
     RECIPIENT = "x@x.com"
     CONFIGURATION_SET = "ConfigSet"
     AWS_REGION = "us-west-2"
     v_location = p_location
+    v_htmlpage = p_htmlpage
 
     subject_line_dt = datetime.now()
 
@@ -65,7 +65,7 @@ def send_email(htmlpage, p_location):
     SUBJECT = subject_line
 
     # The HTML body of the email.
-    BODY_HTML = htmlpage
+    BODY_HTML = v_htmlpage
 
     # The email body for recipients with non-HTML email clients.
     BODY_TEXT = "text weather report)\r\n"
@@ -154,11 +154,11 @@ def get_gridpoints_url(p_latitude, p_longitude):
 
 
 def weather_report(p_latitude, p_longitude, p_location):
-    global htmlpage
 
     v_latitude = p_latitude
     v_longitude = p_longitude
     v_location = p_location
+    v_htmlpage = ""
 
     url = get_gridpoints_url(v_latitude, v_longitude)
 
@@ -172,9 +172,9 @@ def weather_report(p_latitude, p_longitude, p_location):
         print(e)
         return False
 
-
-    htmlpage += "<body> <h2>" + v_location + " Forecast</h2> <hr/>"
-    htmlpage += """<table border="1" width="645">"""
+    v_htmlpage = """<html><head><title>Forecast</title></head>"""
+    v_htmlpage += "<body> <h2>" + v_location + " Forecast</h2> <hr/>"
+    v_htmlpage += """<table border="1" width="645">"""
 
     # print(response.text)
 
@@ -183,72 +183,72 @@ def weather_report(p_latitude, p_longitude, p_location):
     periods = data["properties"]["periods"]
 
     # build the table header for the forecast by day of week/AM/PM
-    htmlpage += "<tr>"
+    v_htmlpage += "<tr>"
     for i in periods:
         if i['isDaytime']:
-            htmlpage += "<th>" + i['name'] + "</th>"
+            v_htmlpage += "<th>" + i['name'] + "</th>"
 
-    htmlpage += "</tr>\n"
+    v_htmlpage += "</tr>\n"
 
     # get the daytime information
-    htmlpage += "<tr>"
+    v_htmlpage += "<tr>"
     for i in periods:
         if i['isDaytime']:
             wind_info = get_max_wind(i['windSpeed'], i['windDirection'])
-            htmlpage += "<td>" + "Hi " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + wind_info + "</td>"
+            v_htmlpage += "<td>" + "Hi " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + wind_info + "</td>"
 
-    htmlpage += "</tr>\n"
+    v_htmlpage += "</tr>\n"
 
     # get the daytime icons
-    htmlpage += "<tr>"
+    v_htmlpage += "<tr>"
     for i in periods:
         if i['isDaytime']:
-            htmlpage += "<td>" + "<img src=" + i['icon'] + "></td>"
+            v_htmlpage += "<td>" + "<img src=" + i['icon'] + "></td>"
 
-    htmlpage += "</tr>\n"
+    v_htmlpage += "</tr>\n"
 
     # get the evening information
-    htmlpage += "<tr>"
+    v_htmlpage += "<tr>"
     for i in periods:
         if not i['isDaytime']:
             wind_info = get_max_wind(i['windSpeed'], i['windDirection'])
-            htmlpage += "<td>" + "Lo " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + wind_info + "</td>"
+            v_htmlpage += "<td>" + "Lo " + str(i['temperature']) + "º" + "<br>" + i['shortForecast'] + wind_info + "</td>"
 
-    htmlpage += "</tr>\n"
+    v_htmlpage += "</tr>\n"
 
     # get the evening icons
-    htmlpage += "<tr>"
+    v_htmlpage += "<tr>"
     for i in periods:
         if not i['isDaytime']:
-            htmlpage += "<td>" + "<img src=" + i['icon'] + "></td>"
+            v_htmlpage += "<td>" + "<img src=" + i['icon'] + "></td>"
 
-    #    htmlpage += "<td>" + str(i['temperature']) + "</td>"
-    #    htmlpage += "<td>" + i['shortForecast'] + "</td>"
-    #    htmlpage += "<td>" + "<img src=" + i['icon'] + "></td>"
+    #    v_htmlpage += "<td>" + str(i['temperature']) + "</td>"
+    #    v_htmlpage += "<td>" + i['shortForecast'] + "</td>"
+    #    v_htmlpage += "<td>" + "<img src=" + i['icon'] + "></td>"
 
-    htmlpage += "</tr>\n"
+    v_htmlpage += "</tr>\n"
 
     # now get detailed forecast
-    htmlpage += """
+    v_htmlpage += """
 </table>
 <hr/>
 """
 
     # build the table for the detailed forecast by day of week/AM/PM
-    htmlpage += "<h3>Detailed Forecast </h3> "
-    htmlpage += """
-    <table border="1" width="645"> 
+    v_htmlpage += "<h3>Detailed Forecast </h3> "
+    v_htmlpage += """
+    <table border="1" width="645">
     """
     for i in periods:
-        htmlpage += "<tr><td style=""" + "font-weight:bold""" + ">"
-        htmlpage += i['name'] + "</td> <td>" + i['detailedForecast'] + "</td></tr>"
+        v_htmlpage += "<tr><td style=""" + "font-weight:bold""" + ">"
+        v_htmlpage += i['name'] + "</td> <td>" + i['detailedForecast'] + "</td></tr>"
 
     # finish up html string
-    htmlpage += """
+    v_htmlpage += """
 </body>
 </html>
 """
-    return True
+    return v_htmlpage
 
 
 if __name__ == "__main__": main()
