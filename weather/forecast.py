@@ -26,19 +26,31 @@ def lambda_handler(event, context):
         raise Exception('Location not provided')
 
     for i in range(5):
-        v_htmlpage = weather_report(v_latitude, v_longitude, v_location)
+        v_url_gridpoint = get_gridpoints_url(v_latitude, v_longitude)
 
-        if not v_htmlpage:
-            print("Unable to generate weather forecast...Attempt #" + str(i) + " failed...retrying")
-            time.sleep(60)
+        if not v_url_gridpoint:
+            print("Unable to get gridpoint for lat/long...Attempt #" + str(i) + " failed...retrying")
+            time.sleep(30)
         else:
-            weather_report_gend = True
+            break
+
+    if not v_url_gridpoint:
+        print("Unable to get gridpoint for lat/long...exceeded maximum attempts..aborting...")
+    else:
+        for i in range(5):
+            v_htmlpage = weather_report(v_url_gridpoint, v_location)
+            if not v_htmlpage:
+                print("Unable to generate weather forecast...Attempt #" + str(i) + " failed...retrying")
+                time.sleep(30)
+            else:
+                weather_report_gend = True
+                break
 
     if weather_report_gend:
         # print(v_htmlpage)
         send_email(v_htmlpage, v_location)
     else:
-        print("Weather Report could not be generated")
+        print("Weather Report could not be generated.exceeded maximum attempts...aborting...")
     return {
         'statusCode': 200,
         'body': v_htmlpage
@@ -53,12 +65,7 @@ def send_email(p_htmlpage, p_location):
     v_location = p_location
     v_htmlpage = p_htmlpage
 
-    subject_line_dt = datetime.now()
-
-    # dt_string = subject_line_dt.strftime("%m/%d/%Y %H:%M")
-
-    dt_string_local = subject_line_dt.replace(tzinfo=timezone.utc).astimezone(tz=None)
-    dt_string = dt_string_local.strftime("%m/%d/%Y %H:%M")
+    print("Forecast generated -> sending email")
     subject_line = v_location + " Forecast "
 
     # The subject line for the email.
@@ -109,7 +116,7 @@ def send_email(p_htmlpage, p_location):
     except ClientError as e:
         print(e.response['Error']['Message'])
     else:
-        print("Email sent! Message ID:"),
+        print("Email successfully sent! Message ID:"),
         print(response['MessageId'])
 
 
@@ -128,10 +135,11 @@ def get_max_wind(p_raw_wind_speed, p_wind_raw_direction):
 
 def get_gridpoints_url(p_latitude, p_longitude):
     # provide lat/long in decimal format
-    v_url = "https://api.weather.gov/points/" + str(p_latitude) + "," + str(p_longitude)
+    v_url_latlong = "https://api.weather.gov/points/" + str(p_latitude) + "," + str(p_longitude)
+    print("URL to get gridpoint..." + v_url_latlong)
 
     try:
-        response = requests.request("GET", v_url)
+        response = requests.request("GET", v_url_latlong)
     except requests.exceptions.Timeout:
         print("Timeout exception on get request to get gridpoint")
         return False
@@ -145,25 +153,21 @@ def get_gridpoints_url(p_latitude, p_longitude):
 
     data = response.json()
 
-    v_url = data["properties"]["forecast"]
+    v_url_gridpoint = data["properties"]["forecast"]
 
-    print("url for forecast...")
-    print(v_url)
+    print("URL for forecast..." + v_url_gridpoint)
 
-    return v_url
+    return v_url_gridpoint
 
 
-def weather_report(p_latitude, p_longitude, p_location):
+def weather_report(p_url_gridpoint, p_location):
 
-    v_latitude = p_latitude
-    v_longitude = p_longitude
     v_location = p_location
     v_htmlpage = ""
-
-    url = get_gridpoints_url(v_latitude, v_longitude)
+    v_url_gridpoint = p_url_gridpoint
 
     try:
-        response = requests.request("GET", url)
+        response = requests.request("GET", v_url_gridpoint)
     except requests.exceptions.Timeout:
         print("Timeout exception on get request")
         return False
