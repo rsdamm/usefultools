@@ -25,6 +25,8 @@ def lambda_handler(event, context):
     else:
         raise Exception('Location not provided')
 
+    print ("Forecast for latitude/longitude " + str(v_latitude) + "," + str(v_longitude) + ": " + v_location)
+
     for i in range(5):
         v_url_gridpoint = get_gridpoints_url(v_latitude, v_longitude)
 
@@ -58,8 +60,8 @@ def lambda_handler(event, context):
 
 
 def send_email(p_htmlpage, p_location):
-    SENDER = "x@x.com"
-    RECIPIENT = "x@x.com"
+    SENDER = "renee@plesba.com"
+    RECIPIENT = "damm@plesba.com"
     CONFIGURATION_SET = "ConfigSet"
     AWS_REGION = "us-west-2"
     v_location = p_location
