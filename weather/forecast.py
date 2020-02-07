@@ -60,8 +60,8 @@ def lambda_handler(event, context):
 
 
 def send_email(p_htmlpage, p_location):
-    SENDER = "renee@plesba.com"
-    RECIPIENT = "damm@plesba.com"
+    SENDER = "x@x.com"
+    RECIPIENT = "x@x.com"
     CONFIGURATION_SET = "ConfigSet"
     AWS_REGION = "us-west-2"
     v_location = p_location
@@ -150,6 +150,7 @@ def get_gridpoints_url(p_latitude, p_longitude):
         print(e)
         return False
 
+    print(f"WeatherAPI request for gridpoint got status code {response.status_code}")
     # print(response.text)
     # build url string that will get forecast --> https://api.weather.gov/gridpoints/BOU/45,66/forecast
 
@@ -177,6 +178,7 @@ def weather_report(p_url_gridpoint, p_location):
         print("Exception raised on get request")
         print(e)
         return False
+    print(f"WeatherAPI request for forecast got status code {response.status_code}")
 
     v_htmlpage = """<html><head><title>Forecast</title></head>"""
     v_htmlpage += "<body> <h2>" + v_location + " Forecast</h2> <hr/>"
