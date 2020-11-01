@@ -1,13 +1,14 @@
-from botocore.vendored import requests
 import boto3
 from botocore.exceptions import ClientError
 from datetime import datetime, timezone
+import urllib3
+import json
 
 # https://docs.aws.amazon.com/ses/latest/DeveloperGuide/send-using-sdk-python.html
 
 
 def lambda_handler(event, context):
-#cannot be global or lambda will reuse for subsequent executions from same container
+    #cannot be global or lambda will reuse for subsequent executions from same container
     v_htmlpage = ""
     weather_report_gend = False
 
@@ -25,20 +26,35 @@ def lambda_handler(event, context):
     else:
         raise Exception('Location not provided')
 
-    for i in range(5):
-        v_htmlpage = weather_report(v_latitude, v_longitude, v_location)
+    print ("Forecast for latitude/longitude " + str(v_latitude) + "," + str(v_longitude) + ": " + v_location)
 
-        if not v_htmlpage:
-            print("Unable to generate weather forecast...Attempt #" + str(i) + " failed...retrying")
-            time.sleep(60)
+    for i in range(5):
+        v_url_gridpoint = get_gridpoints_url(v_latitude, v_longitude)
+
+        if not v_url_gridpoint:
+            print("Unable to get gridpoint for lat/long...Attempt #" + str(i) + " failed...retrying")
+            time.sleep(30)
         else:
-            weather_report_gend = True
+            break
+
+    if not v_url_gridpoint:
+        print("Unable to get gridpoint for lat/long...exceeded maximum attempts..aborting...")
+    else:
+        print("Received gridpoint for lat/long. Continuing...")
+        for i in range(5):
+            v_htmlpage = weather_report(v_url_gridpoint, v_location)
+            if not v_htmlpage:
+                print("Unable to generate weather forecast...Attempt #" + str(i) + " failed...retrying")
+                time.sleep(30)
+            else:
+                weather_report_gend = True
+                break
 
     if weather_report_gend:
         # print(v_htmlpage)
         send_email(v_htmlpage, v_location)
     else:
-        print("Weather Report could not be generated")
+        print("Weather Report could not be generated.exceeded maximum attempts...aborting...")
     return {
         'statusCode': 200,
         'body': v_htmlpage
@@ -47,18 +63,13 @@ def lambda_handler(event, context):
 
 def send_email(p_htmlpage, p_location):
     SENDER = "x@x.com"
-    RECIPIENT = "x@x.com"
+    RECIPIENT = "y@x.com"
     CONFIGURATION_SET = "ConfigSet"
     AWS_REGION = "us-west-2"
     v_location = p_location
     v_htmlpage = p_htmlpage
 
-    subject_line_dt = datetime.now()
-
-    # dt_string = subject_line_dt.strftime("%m/%d/%Y %H:%M")
-
-    dt_string_local = subject_line_dt.replace(tzinfo=timezone.utc).astimezone(tz=None)
-    dt_string = dt_string_local.strftime("%m/%d/%Y %H:%M")
+    print("Forecast generated -> sending email")
     subject_line = v_location + " Forecast "
 
     # The subject line for the email.
@@ -109,7 +120,7 @@ def send_email(p_htmlpage, p_location):
     except ClientError as e:
         print(e.response['Error']['Message'])
     else:
-        print("Email sent! Message ID:"),
+        print("Email successfully sent! Message ID:"),
         print(response['MessageId'])
 
 
@@ -128,49 +139,58 @@ def get_max_wind(p_raw_wind_speed, p_wind_raw_direction):
 
 def get_gridpoints_url(p_latitude, p_longitude):
     # provide lat/long in decimal format
-    v_url = "https://api.weather.gov/points/" + str(p_latitude) + "," + str(p_longitude)
+    v_url_latlong = "https://api.weather.gov/points/" + str(p_latitude) + "," + str(p_longitude)
+    print("URL to get gridpoint..." + v_url_latlong)
 
-    try:
-        response = requests.request("GET", v_url)
-    except requests.exceptions.Timeout:
-        print("Timeout exception on get request to get gridpoint")
-        return False
-    except requests.exceptions.RequestException as e:
-        print("Exception raised on get request to get gridpoint")
-        print(e)
-        return False
+    user_agent = {'user-agent': 'reneeforecaster weather@plesba.com'}
+    http = urllib3.PoolManager(10, headers=user_agent)
 
-    # print(response.text)
+    for i in range(5):
+        try:
+            response = http.request("GET", v_url_latlong)
+        except urllib3.exceptions.TimeoutError:
+            print("Timeout exception on get request to get gridpoint")
+            return False
+        except urllib3.error.URLError as e:
+            print("Exception raised on get request to get gridpoint")
+            print(e)
+            return False
+
+        print(f"WeatherAPI request for gridpoint got status code {response.status}")
+        if response.status == 200:
+            break
     # build url string that will get forecast --> https://api.weather.gov/gridpoints/BOU/45,66/forecast
 
-    data = response.json()
+    #data = response.json()
+    data = json.loads(response.data.decode('utf-8'))
+    v_url_gridpoint = data["properties"]["forecast"]
 
-    v_url = data["properties"]["forecast"]
+    print("URL for forecast..." + v_url_gridpoint)
 
-    print("url for forecast...")
-    print(v_url)
-
-    return v_url
+    return v_url_gridpoint
 
 
-def weather_report(p_latitude, p_longitude, p_location):
-
-    v_latitude = p_latitude
-    v_longitude = p_longitude
+def weather_report(p_url_gridpoint, p_location):
+    print('starting function')
     v_location = p_location
     v_htmlpage = ""
+    v_url_gridpoint = p_url_gridpoint
 
-    url = get_gridpoints_url(v_latitude, v_longitude)
-
-    try:
-        response = requests.request("GET", url)
-    except requests.exceptions.Timeout:
-        print("Timeout exception on get request")
-        return False
-    except requests.exceptions.RequestException as e:
-        print("Exception raised on get request")
-        print(e)
-        return False
+    user_agent = {'user-agent': 'forecaster weather@plesba.com'}
+    http = urllib3.PoolManager(10, headers=user_agent)
+    for i in range(5):
+        try:
+            response = http.request("GET", v_url_gridpoint)
+        except urllib3.exceptions.TimeoutError:
+            print("Timeout exception on get request")
+            return False
+        except urllib3.error.URLError  as e:
+            print("Exception raised on get request")
+            print(e)
+            return False
+        print(f"WeatherAPI request for forecast got status code {response.status}")
+        if response.status == 200:
+            break
 
     v_htmlpage = """<html><head><title>Forecast</title></head>"""
     v_htmlpage += "<body> <h2>" + v_location + " Forecast</h2> <hr/>"
@@ -178,8 +198,9 @@ def weather_report(p_latitude, p_longitude, p_location):
 
     # print(response.text)
 
-    data = response.json()
-
+    data = json.loads(response.data.decode('utf-8'))
+    print('printing data')
+    print(data)
     periods = data["properties"]["periods"]
 
     # build the table header for the forecast by day of week/AM/PM
@@ -251,4 +272,12 @@ def weather_report(p_latitude, p_longitude, p_location):
     return v_htmlpage
 
 
-if __name__ == "__main__": main()
+v_event = {
+"latitude": "39.0",
+"longitude": "-105.0",
+"location": "Test CO"
+}
+v_context = None
+
+if __name__ == "__main__":
+    lambda_handler(v_event,v_context)
