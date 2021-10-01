@@ -9,10 +9,10 @@ import json
 
 def lambda_handler(event, context):
     #cannot be global or lambda will reuse for subsequent executions from same container
-    v_htmlpage = ""
+    v_lh_htmlpage = ""
     weather_report_gend = False
 
-    # get parameters for execution example format:  {  "latitude": "39.0", "longitude": "-105.0"", "location": "City State","timezone": "US/Pacify", "sender": "renee@plesba.com", "recipient_list": ["x@domain.com","y@domain.com"]
+    # get parameters for execution example format:  {  "latitude": "39.0", "longitude": "-105.0"", "location": "City State","timezone": "US/Pacific", "sender": "renee@plesba.com", "recipient_list": ["x@domain.com","y@domain.com"]
     v_latitude = get_latitude_from_event(event)
     v_longitude = get_longitude_from_event(event)
     v_location = get_location_from_event(event)
@@ -41,8 +41,8 @@ def lambda_handler(event, context):
     else:
         print("Received gridpoint for lat/long. Continuing...")
         for i in range(5):
-            v_htmlpage = weather_report(v_url_gridpoint, v_location)
-            if not v_htmlpage:
+            v_lh_htmlpage = weather_report(v_url_gridpoint, v_location, v_tz)
+            if not v_lh_htmlpage:
                 print("Unable to generate weather forecast...Attempt #" + str(i) + " failed...retrying")
                 time.sleep(30)
             else:
@@ -51,12 +51,12 @@ def lambda_handler(event, context):
 
     if weather_report_gend:
         # print(v_htmlpage)
-        send_email(v_htmlpage, v_location, weather_report_gend, v_dt_string, v_sender, v_recipient_list)
+        send_email(v_lh_htmlpage, v_location, weather_report_gend, v_dt_string, v_sender, v_recipient_list)
     else:
         print("Weather Report could not be generated. Exceeded maximum attempts...aborting...")
     return {
         'statusCode': 200,
-        'body': v_htmlpage
+        'body': v_lh_htmlpage
     }
 def get_latitude_from_event(p_event):
     if 'latitude' in p_event:
@@ -78,7 +78,7 @@ def get_location_from_event(p_event):
     else:
         raise Exception('ERROR: Location not provided')
     return v_location
-    
+
 def get_timezone_from_event(p_event):
     if 'timezone' in p_event:
         v_timezone = p_event['timezone']
@@ -216,11 +216,13 @@ def get_gridpoints_url(p_latitude, p_longitude):
 
     return v_url_gridpoint
 
-def weather_report(p_url_gridpoint, p_location):
-    print('building weather_report' + p_url_gridpoint + ' ' + p_location)
+def weather_report(p_url_gridpoint, p_location, p_tz):
+    print('building weather_report ' + p_url_gridpoint + ' ' + p_location)
     v_location = p_location
     v_htmlpage = ""
+    v_updated_forecast_data = ""
     v_url_gridpoint = p_url_gridpoint
+    v_forecast_dt_string = ""
 
     user_agent = {'user-agent': 'forecaster weather@plesba.com'}
     http = urllib3.PoolManager(10, headers=user_agent)
@@ -241,13 +243,31 @@ def weather_report(p_url_gridpoint, p_location):
     #format html page
     v_htmlpage = """<html><head><title>Forecast</title></head>"""
     v_htmlpage += "<body> <h2>" + v_location + " Forecast</h2> <hr/>"
-    v_htmlpage += """<table border="1" width="645">"""
 
-    #print(response.text)
+    #print("printing response text in JSON")
+    #print(response.data.decode('utf-8'))
+
     data = ""
     data = json.loads(response.data.decode('utf-8'))
     print('printing data in function weather_report')
-    print(data)
+
+    #print(data)
+    v_updated_forecast_data = data["properties"]["updated"]
+
+    #example 2021-09-28T21:03:10+00:00
+
+    v_forecast_dt = datetime.strptime(v_updated_forecast_data,"%Y-%m-%dT%H:%M:%S%z")
+    v_forecast_dt_tz = v_forecast_dt.astimezone(p_tz)
+    v_forecast_dt_string = v_forecast_dt_tz.strftime("%m/%d/%Y %H:%M:%S")
+
+    print("Forecast data reported by API with offset: " + v_updated_forecast_data)
+    print("Forecast data reported by API converted to local time: " + v_forecast_dt_string)
+
+    v_htmlpage += """Forecast data from API as of : """
+    v_htmlpage += v_forecast_dt_string
+
+    v_htmlpage += """<table border="1" width="645">"""
+
     periods = data["properties"]["periods"]
 
     # build the table header for the forecast by day of week/AM/PM
