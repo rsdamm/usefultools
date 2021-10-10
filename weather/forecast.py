@@ -263,16 +263,14 @@ def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
     v_forecast_dt = datetime.strptime(v_updated_forecast_data,"%Y-%m-%dT%H:%M:%S%z")
     v_forecast_dt_tz = v_forecast_dt.astimezone(v_tz)
     v_forecast_dt_string = v_forecast_dt_tz.strftime("%m/%d/%Y %H:%M:%S")
-    v_API_data_currency = v_dt_tz_now - v_forecast_dt_tz
-    v_API_data_currency_s = v_API_data_currency.total_seconds()
-    v_days = divmod(v_API_data_currency_s, 86400)
-    v_hours = divmod(v_days[1], 3600)
+    v_API_currency = v_dt_tz_now - v_forecast_dt_tz
+    v_hours = v_API_currency.total_seconds()/3600
 
     print("Forecast data reported by API with offset: " + v_updated_forecast_data)
     print("Forecast data reported by API converted to local time: " + v_forecast_dt_string)
-    print("Forecast data is: %d days, %d hours" % (v_days[0], v_hours[0]) + " old")
+    print("Forecast data is: %d hours" % (v_hours) + " old")
 
-    v_age_str = "Forecast data is: %d days, %d hours" % (v_days[0], v_hours[0]) + " old"
+    v_age_str = "Forecast data is: %d hours" % (v_hours) + " old"
 
     v_htmlpage += """Forecast data from API as of : """
     v_htmlpage += v_forecast_dt_string
