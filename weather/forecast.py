@@ -226,7 +226,7 @@ def weather_report(p_url_gridpoint, p_location, p_tz):
 
     user_agent = {'user-agent': 'forecaster weather@plesba.com'}
     http = urllib3.PoolManager(10, headers=user_agent)
-    for i in range(5):
+    for i in range(10):
         try:
             response = http.request("GET", v_url_gridpoint)
         except urllib3.exceptions.TimeoutError:
@@ -236,9 +236,17 @@ def weather_report(p_url_gridpoint, p_location, p_tz):
             print("ERROR: Exception raised on get request")
             print(e)
             return False
-        print("WeatherAPI request for forecast got status code " + str({response.status}) + " on attempt# "+ str(i) +  " retrying...")
-        if response.status == 200:
-            break
+        if response.status != 200:
+            print("WeatherAPI request for forecast got status code " + str({response.status}) + " on attempt# "+ str(i) +  " retrying...")
+        else:
+            # check how old the forecast is
+            data = json.loads(response.data.decode('utf-8'))
+            v_updated_forecast_data = data["properties"]["updated"]
+            v_forecast_dt = datetime.strptime(v_updated_forecast_data,"%Y-%m-%dT%H:%M:%S%z")
+            elapsed_since_generated = datetime.datetime.utcnow() - v_forecast_dt
+            if elapsed_since_generated.total_seconds() < 5*60*60: # five hours
+                break
+            # looks like our forecast is less than five hours old; run with it.
 
     #format html page
     v_htmlpage = """<html><head><title>Forecast</title></head>"""
