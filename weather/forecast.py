@@ -12,7 +12,7 @@ def lambda_handler(event, context):
     v_lh_htmlpage = ""
     weather_report_gend = False
 
-    # get parameters for execution example format:  {  "latitude": "39.0", "longitude": "-105.0"", "location": "City State","timezone": "US/Pacific", "sender": "renee@plesba.com", "recipient_list": ["x@domain.com","y@domain.com"]
+    # get parameters for execution - example format:  {  "latitude": "39.0", "longitude": "-105.0"", "location": "City State","timezone": "US/Pacific", "sender": "renee@plesba.com", "recipient_list": ["x@domain.com","y@domain.com"]
     v_latitude = get_latitude_from_event(event)
     v_longitude = get_longitude_from_event(event)
     v_location = get_location_from_event(event)
@@ -20,10 +20,13 @@ def lambda_handler(event, context):
     v_sender = get_sender_from_event(event)
     v_recipient_list = get_recipient_list_from_event(event)
 
+    # get date/time and adjust to timezone
     v_tz = dateutil.tz.gettz(v_timezone)
-    v_dt_string = datetime.now(v_tz).strftime("%m/%d/%Y %H:%M:%S")
+    v_dt_tz_now = datetime.now(v_tz)
+    #v_dt_string_tz_now = datetime.now(v_tz).strftime("%m/%d/%Y %H:%M:%S")
+    v_dt_string_tz_now = v_dt_tz_now.strftime("%m/%d/%Y %H:%M:%S")
 
-    print ("Forecast for latitude/longitude " + str(v_latitude) + "," + str(v_longitude) + ": " + v_location + " for " + v_dt_string)
+    print ("Forecast for latitude/longitude " + str(v_latitude) + "," + str(v_longitude) + ": " + v_location + " for " + v_dt_string_tz_now)
 
     #get the URL gridpoint - trying 5 times
     for i in range(5):
@@ -41,7 +44,7 @@ def lambda_handler(event, context):
     else:
         print("Received gridpoint for lat/long. Continuing...")
         for i in range(5):
-            v_lh_htmlpage = weather_report(v_url_gridpoint, v_location, v_tz)
+            v_lh_htmlpage = weather_report(v_url_gridpoint, v_location, v_tz, v_dt_tz_now)
             if not v_lh_htmlpage:
                 print("Unable to generate weather forecast...Attempt #" + str(i) + " failed...retrying")
                 time.sleep(30)
@@ -51,7 +54,7 @@ def lambda_handler(event, context):
 
     if weather_report_gend:
         # print(v_htmlpage)
-        send_email(v_lh_htmlpage, v_location, weather_report_gend, v_dt_string, v_sender, v_recipient_list)
+        send_email(v_lh_htmlpage, v_location, weather_report_gend, v_dt_string_tz_now, v_sender, v_recipient_list)
     else:
         print("Weather Report could not be generated. Exceeded maximum attempts...aborting...")
     return {
@@ -100,22 +103,22 @@ def get_recipient_list_from_event(p_event):
         raise Exception('ERROR: recipient list not provided')
     return v_recipient_list
 
-def send_email(p_htmlpage, p_location, p_weather_report_gend, p_dt_string, p_sender, p_recipient_list):
+def send_email(p_htmlpage, p_location, p_weather_report_gend, p_dt_string_tz_now, p_sender, p_recipient_list):
     CONFIGURATION_SET = "ConfigSet"
     AWS_REGION = "us-west-2"
     v_location = p_location
     v_htmlpage = p_htmlpage
     v_weather_report_gend = p_weather_report_gend
-    v_dt_string = p_dt_string
+    v_dt_string_tz_now = p_dt_string_tz_now
     v_sender = p_sender
     v_recipient_list = p_recipient_list
 
     if v_weather_report_gend:
         print("Forecast generated -> sending email")
-        subject_line = v_location + " Forecast " + v_dt_string
+        subject_line = v_location + " Forecast " + v_dt_string_tz_now
     else:
         print("ERROR: Forecast was not generated -> sending error email")
-        subject_line = v_location + " Forecast - problem encountered " + v_dt_string
+        subject_line = v_location + " Forecast - problem encountered " + v_dt_string_tz_now
 
     # The subject line for the email.
     SUBJECT = subject_line
@@ -216,16 +219,19 @@ def get_gridpoints_url(p_latitude, p_longitude):
 
     return v_url_gridpoint
 
-def weather_report(p_url_gridpoint, p_location, p_tz):
+def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
     print('building weather_report ' + p_url_gridpoint + ' ' + p_location)
     v_location = p_location
     v_htmlpage = ""
     v_updated_forecast_data = ""
     v_url_gridpoint = p_url_gridpoint
     v_forecast_dt_string = ""
+    v_tz = p_tz
+    v_dt_tz_now = p_dt_tz_now
 
     user_agent = {'user-agent': 'forecaster weather@plesba.com'}
     http = urllib3.PoolManager(10, headers=user_agent)
+    forecast_is_recent = False
     for i in range(10):
         try:
             response = http.request("GET", v_url_gridpoint)
@@ -242,11 +248,19 @@ def weather_report(p_url_gridpoint, p_location, p_tz):
             # check how old the forecast is
             data = json.loads(response.data.decode('utf-8'))
             v_updated_forecast_data = data["properties"]["updated"]
-            v_forecast_dt = datetime.strptime(v_updated_forecast_data,"%Y-%m-%dT%H:%M:%S%z")
-            elapsed_since_generated = datetime.datetime.utcnow() - v_forecast_dt
+            v_forecast_dt = datetime.strptime(v_updated_forecast_data,"%Y-%m-%dT%H:%M:%S%z")    
+            v_forecast_dt_tz = v_forecast_dt.astimezone(v_tz)
+            elapsed_since_generated = v_dt_tz_now - v_forecast_dt_tz
             if elapsed_since_generated.total_seconds() < 5*60*60: # five hours
+                forecast_is_recent = True
                 break
-            # looks like our forecast is less than five hours old; run with it.
+            
+    if forecast_is_recent:
+        # looks like our forecast is less than five hours old; run with it.
+        print("Forecast is recent, proceeding")
+    else:
+        print("ERROR: Forecast too old after max_tries, aborting")
+        return False
 
     #format html page
     v_htmlpage = """<html><head><title>Forecast</title></head>"""
@@ -259,20 +273,26 @@ def weather_report(p_url_gridpoint, p_location, p_tz):
     data = json.loads(response.data.decode('utf-8'))
     print('printing data in function weather_report')
 
-    #print(data)
+    print(data)
     v_updated_forecast_data = data["properties"]["updated"]
 
     #example 2021-09-28T21:03:10+00:00
-
     v_forecast_dt = datetime.strptime(v_updated_forecast_data,"%Y-%m-%dT%H:%M:%S%z")
-    v_forecast_dt_tz = v_forecast_dt.astimezone(p_tz)
+    v_forecast_dt_tz = v_forecast_dt.astimezone(v_tz)
     v_forecast_dt_string = v_forecast_dt_tz.strftime("%m/%d/%Y %H:%M:%S")
-
+    v_API_currency = v_dt_tz_now - v_forecast_dt_tz  
+    v_hours = v_API_currency.total_seconds()/3600
+    
     print("Forecast data reported by API with offset: " + v_updated_forecast_data)
     print("Forecast data reported by API converted to local time: " + v_forecast_dt_string)
+    print("Forecast data is: %d hours" % (v_hours) + " old")
+    
+    v_age_str = "Forecast data is: %d hours" % (v_hours) + " old"
 
     v_htmlpage += """Forecast data from API as of : """
     v_htmlpage += v_forecast_dt_string
+    v_htmlpage += " - "
+    v_htmlpage += v_age_str
 
     v_htmlpage += """<table border="1" width="645">"""
 
