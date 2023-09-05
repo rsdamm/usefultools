@@ -1,6 +1,7 @@
 import boto3
 from botocore.exceptions import ClientError
 from datetime import datetime
+import time
 import dateutil.tz
 import urllib3
 import json
@@ -220,6 +221,8 @@ def get_gridpoints_url(p_latitude, p_longitude):
     return v_url_gridpoint
 
 def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
+    max_age_in_hours = 10
+    max_age_in_seconds = max_age_in_hours* 3600
     print('building weather_report ' + p_url_gridpoint + ' ' + p_location)
     v_location = p_location
     v_htmlpage = ""
@@ -243,7 +246,7 @@ def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
             print(e)
             return False
         if response.status != 200:
-            print("WeatherAPI request for forecast got status code " + str({response.status}) + " on attempt# "+ str(i) +  " retrying...")
+            print("WeatherAPI request for forecast got status code " + str({response.status}) + " on attempt# "+ str(i) +  ", retrying...")
         else:
             # check how old the forecast is
             data = json.loads(response.data.decode('utf-8'))
@@ -251,16 +254,18 @@ def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
             v_forecast_dt = datetime.strptime(v_updated_forecast_data,"%Y-%m-%dT%H:%M:%S%z")    
             v_forecast_dt_tz = v_forecast_dt.astimezone(v_tz)
             elapsed_since_generated = v_dt_tz_now - v_forecast_dt_tz
-            if elapsed_since_generated.total_seconds() < 5*60*60: # five hours
+            hours_elapsed = elapsed_since_generated.total_seconds() / 3600
+            if hours_elapsed < max_age_in_hours:
                 forecast_is_recent = True
                 break
+            time.sleep(31) # wait before we go around again
             
     if forecast_is_recent:
         # looks like our forecast is less than five hours old; run with it.
         print("Forecast is recent, proceeding")
     else:
-        print("ERROR: Forecast too old after max_tries, aborting")
-        return False
+        return "ERROR: Forecast too old" + hours_elapsed + " after max_tries, aborting"  # was a print statement and return False
+        
 
     #format html page
     v_htmlpage = """<html><head><title>Forecast</title></head>"""
@@ -365,6 +370,7 @@ def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
 </html>
 """
     return v_htmlpage
+    
 v_event = {
     "latitude": "39.0",
     "longitude": "-105.0",
