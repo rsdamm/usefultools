@@ -250,7 +250,7 @@ def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
         else:
             # check how old the forecast is
             data = json.loads(response.data.decode('utf-8'))
-            v_updated_forecast_data = data["properties"]["updated"]
+            v_updated_forecast_data = data["properties"]["updateTime"]
             v_forecast_dt = datetime.strptime(v_updated_forecast_data,"%Y-%m-%dT%H:%M:%S%z")    
             v_forecast_dt_tz = v_forecast_dt.astimezone(v_tz)
             elapsed_since_generated = v_dt_tz_now - v_forecast_dt_tz
@@ -279,7 +279,7 @@ def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
     print('printing data in function weather_report')
 
     print(data)
-    v_updated_forecast_data = data["properties"]["updated"]
+    v_updated_forecast_data = data["properties"]["updateTime"]
 
     #example 2021-09-28T21:03:10+00:00
     v_forecast_dt = datetime.strptime(v_updated_forecast_data,"%Y-%m-%dT%H:%M:%S%z")
