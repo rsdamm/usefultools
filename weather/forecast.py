@@ -13,7 +13,7 @@ def lambda_handler(event, context):
     v_lh_htmlpage = ""
     weather_report_gend = False
 
-    # get parameters for execution - example format:  {  "latitude": "39.0", "longitude": "-105.0"", "location": "City State","timezone": "US/Pacific", "sender": "renee@plesba.com", "recipient_list": ["x@domain.com","y@domain.com"]
+    # get parameters for execution - example format:  {  "latitude": "39.0", "longitude": "-105.0"", "location": "City State","timezone": "US/Pacific", "sender": "xdomain.com", "recipient_list": ["x@domain.com","y@domain.com"]
     v_latitude = get_latitude_from_event(event)
     v_longitude = get_longitude_from_event(event)
     v_location = get_location_from_event(event)
