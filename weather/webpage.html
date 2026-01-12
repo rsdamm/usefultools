@@ -138,14 +138,6 @@
                 <div class="info-label">Longitude</div>
                 <div class="info-value" id="longitude">—</div>
             </div>
-            <div class="info-row">
-                <div class="info-label">Accuracy</div>
-                <div class="info-value" id="accuracy">—</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Timestamp</div>
-                <div class="info-value" id="timestamp">—</div>
-            </div>
         </div>
         
         <button id="getLocationBtn" onclick="getLocation()">Get My Location</button>
@@ -155,9 +147,7 @@
         const statusDiv = document.getElementById('status');
         const locationInfo = document.getElementById('locationInfo');
         const getLocationBtn = document.getElementById('getLocationBtn');
-
-        // Configuration - Update this to your backend URL
-        const BACKEND_URL = '/api/weather'; // Change this to your actual API endpoint
+        const BACKEND_URL = 'https://qfjlj3ftcjg3lms4u2tiea262i0dvpks.lambda-url.us-west-2.on.aws'
 
         function updateStatus(message, type = 'loading') {
             statusDiv.textContent = message;
@@ -167,8 +157,6 @@
         function displayLocation(latitude, longitude, accuracy, timestamp) {
             document.getElementById('latitude').textContent = latitude. toFixed(6);
             document.getElementById('longitude').textContent = longitude.toFixed(6);
-            document.getElementById('accuracy').textContent = accuracy ?  `${accuracy. toFixed(1)} meters` : 'N/A';
-            document.getElementById('timestamp').textContent = new Date(timestamp).toLocaleString();
             locationInfo.classList.add('visible');
         }
 
@@ -177,27 +165,30 @@
             const params = new URLSearchParams({
                 latitude: latitude. toFixed(6),
                 longitude: longitude.toFixed(6),
-                accuracy: accuracy || 0,
-                timestamp: timestamp
+                location: 'Local',
+                timezone: 'US/Pacific'
             });
 
             const urlWithParams = `${BACKEND_URL}?${params. toString()}`;
 
-            // Send the location data to your backend
+	     // Send the location data to your backend and replace the body if successful
             fetch(urlWithParams)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response. status}`);
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
-                    return response.json();
+                    // Get the raw response text (assume it's .html formatted)
+                    return response.text();
                 })
-                .then(data => {
-                    console.log('Location sent to server:', data);
-                    updateStatus('✅ Location retrieved and sent to server', 'success');
+                .then(html => {
+                    // Replace the entire page content with the returned HTML
+                    document.open();
+                    document.write(html);
+                    document.close();
                 })
                 .catch(error => {
-                    console. error('Error sending location to server:', error);
-                    updateStatus('⚠️ Location retrieved but failed to send to server', 'error');
+                    console.error('Error sending location to server:', error);
+                    updateStatus('⚠️  Location retrieved but failed to send to server', 'error');
                 });
         }
 
