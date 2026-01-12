@@ -13,7 +13,7 @@ def lambda_handler(event, context):
     v_lh_htmlpage = ""
     weather_report_gend = False
 
-    # get parameters for execution - example format:  {  "latitude": "45.5", "longitude": "-122.6"", "location": "Portland, OR","timezone": "US/Pacific"]
+    # get parameters for execution - example format:  {  "latitude": "45.0", "longitude": "-122.0"", "location": "Portland, OR","timezone": "US/Pacific"]
 
     if 'queryStringParameters' in event: 
         if ('latitude' in event['queryStringParameters'] and 'longitude' in event['queryStringParameters'] and 
