@@ -13,23 +13,21 @@ def lambda_handler(event, context):
     v_lh_htmlpage = ""
     weather_report_gend = False
 
-    # get parameters for execution - example format:  {  "latitude": "45.0", "longitude": "-122.0"", "location": "Portland, OR","timezone": "US/Pacific"]
+    # get parameters for execution - example format:  {  "latitude": "45.0", "longitude": "-122.0"}
 
     if 'queryStringParameters' in event: 
-        if ('latitude' in event['queryStringParameters'] and 'longitude' in event['queryStringParameters'] and 
-            'location' in event['queryStringParameters'] and 'timezone' in event['queryStringParameters']):
+        if ('latitude' in event['queryStringParameters'] and 'longitude' in event['queryStringParameters'] ): 
             v_request_data = event['queryStringParameters']
             v_latitude = get_latitude_from_event(v_request_data)
-            v_longitude = get_longitude_from_event(v_request_data)
-            v_location = get_location_from_event(v_request_data)
-            v_timezone = get_timezone_from_event(v_request_data) 
-            print ("Weather Report Parameters " + str(v_latitude) + "," + str(v_longitude) + ", " + v_location + ", " + v_timezone)
+            v_longitude = get_longitude_from_event(v_request_data)  
+            v_location = "Local"
+            print ("Weather Report Parameters " + str(v_latitude) + "," + str(v_longitude))
         else:
             print("Weather Report Parameters are missing.")
             return {
             'statusCode': 200 ,
             'headers': {"content-type": "text/html; charset=utf-8"},
-            'body': "Weather Report Parameters are missing."
+            'body': "Weather Report Parameters (latitude/longitude) are missing."
             }
     else: 
         return {
@@ -37,14 +35,13 @@ def lambda_handler(event, context):
         }
 
     # get date/time and adjust to timezone
-    v_tz = dateutil.tz.gettz(v_timezone)
-    #v_tz = dateutil.tz.gettz("US/Pacific") 
+    v_tz = dateutil.tz.gettz("UTC") 
     v_dt_tz_now = datetime.now(v_tz) 
 
     #v_dt_string_tz_now = datetime.now(v_tz).strftime("%m/%d/%Y %H:%M:%S")
     v_dt_string_tz_now = v_dt_tz_now.strftime("%m/%d/%Y %H:%M:%S")
 
-    print ("Forecast for latitude/longitude " + str(v_latitude) + "," + str(v_longitude) + ", " + v_location + " at " + v_dt_string_tz_now)
+    print ("Forecast for latitude/longitude " + str(v_latitude) + "," + str(v_longitude) + ", " + "Local" + " at UTC " + v_dt_string_tz_now)
 
     #get the URL gridpoint - trying 5 times
     for i in range(5):
@@ -86,15 +83,7 @@ def get_latitude_from_event(p_request_data):
 def get_longitude_from_event(p_request_data): 
          
     return p_request_data.get('longitude') 
-
-def get_location_from_event(p_request_data): 
-     
-    return p_request_data.get('location')
-
-def get_timezone_from_event(p_request_data): 
-     
-    return p_request_data.get('timezone')
-
+ 
 def get_max_wind(p_raw_wind_speed, p_wind_raw_direction):
     # wind comes in 2 forms:  7 mph and 6 to 19 mph. need to get last if range is provided.
 
@@ -215,9 +204,6 @@ def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
     
     v_age_str = "Forecast data is: %d hours" % (v_hours) + " old"
 
-    v_htmlpage += """Forecast data from API as of : """
-    v_htmlpage += v_forecast_dt_string
-    v_htmlpage += " - "
     v_htmlpage += v_age_str
 
     v_htmlpage += """<table border="1" width="645">"""
