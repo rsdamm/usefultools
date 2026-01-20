@@ -59,7 +59,7 @@ def lambda_handler(event, context):
     else:
         print("Received gridpoint for lat/long. Continuing...")
         for i in range(5):
-            v_lh_htmlpage = weather_report(v_url_gridpoint, v_location, v_tz, v_dt_tz_now)
+            v_lh_htmlpage = weather_report(v_url_gridpoint, v_location, v_tz, v_dt_tz_now, v_latitude, v_longitude)
             if not v_lh_htmlpage:
                 print("Unable to generate weather forecast...Attempt #" + str(i) + " failed...retrying")
                 time.sleep(30)
@@ -130,7 +130,7 @@ def get_gridpoints_url(p_latitude, p_longitude):
 
     return v_url_gridpoint
 
-def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
+def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now, p_latitude, p_longitude):
     max_age_in_hours = 10
     max_age_in_seconds = max_age_in_hours* 3600
     print('building weather_report ' + p_url_gridpoint + ' ' + p_location)
@@ -141,6 +141,8 @@ def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
     v_forecast_dt_string = ""
     v_tz = p_tz
     v_dt_tz_now = p_dt_tz_now
+    v_latitude = p_latitude
+    v_longitude = p_longitude
 
     user_agent = {'user-agent': 'forecaster weather@plesba.com'}
     http = urllib3.PoolManager(10, headers=user_agent)
@@ -202,7 +204,7 @@ def weather_report(p_url_gridpoint, p_location, p_tz, p_dt_tz_now):
     print("Forecast data reported by API converted to local time: " + v_forecast_dt_string)
     print("Forecast data is: %d hours" % (v_hours) + " old")
     
-    v_age_str = "Forecast data is: %d hours" % (v_hours) + " old"
+    v_age_str = "Forecast data is: %d hours" % (v_hours) + " old - Location: " + v_latitude + " " + v_longitude
 
     v_htmlpage += v_age_str
 
